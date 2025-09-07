@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 
 interface USMapProps {
   highlightedState?: string
   onStateClick?: (stateId: string) => void
   correctStates?: string[]
   incorrectStates?: string[]
+  renderKey?: number // Add a key to force re-renders
 }
 
 // Northeast states we want to make interactive
@@ -18,7 +19,8 @@ export default function USMap({
   highlightedState, 
   onStateClick, 
   correctStates = [],
-  incorrectStates = []
+  incorrectStates = [],
+  renderKey = 0
 }: USMapProps) {
   const [hoveredState, setHoveredState] = useState<string | null>(null)
   const [zoom, setZoom] = useState<number>(1)
@@ -27,21 +29,6 @@ export default function USMap({
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const getStateColor = (stateId: string) => {
-    if (correctStates.includes(stateId)) {
-      return "#10b981" // green for correct
-    }
-    if (incorrectStates.includes(stateId)) {
-      return "#ef4444" // red for incorrect
-    }
-    if (highlightedState === stateId) {
-      return "#fbbf24" // bright yellow for highlighted state to guess
-    }
-    if (hoveredState === stateId) {
-      return "#e5e7eb" // light gray for hover
-    }
-    return "#ffffff" // white for default northeast states
-  }
 
   // Zoom and pan handlers
   const handleWheel = (e: React.WheelEvent) => {
@@ -130,28 +117,80 @@ export default function USMap({
 
   // Update colors when game state changes
   useEffect(() => {
-    if (!containerRef.current) return
+    const updateColors = () => {
+      if (!containerRef.current) return false
 
-    const svgElement = containerRef.current.querySelector('svg')
-    if (!svgElement) return
+      const svgElement = containerRef.current.querySelector('svg')
+      if (!svgElement) return false
 
-    // Update northeast states colors - update ALL elements with northeast state classes
-    northeastStates.forEach(stateId => {
-      const stateClass = stateId.toLowerCase()
-      const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
-      
-      stateElements.forEach(stateElement => {
-        const color = getStateColor(stateId)
-        stateElement.setAttribute('fill', color)
+      // Update each state's color directly
+      northeastStates.forEach(stateId => {
+        const stateClass = stateId.toLowerCase()
+        const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
+        
+        let color = '#ffffff' // default white
+        
+        if (correctStates.includes(stateId)) {
+          color = '#10b981' // green
+        } else if (incorrectStates.includes(stateId)) {
+          color = '#ef4444' // red
+        } else if (highlightedState === stateId) {
+          color = '#ffff00' // bright yellow
+        }
+        // Remove hoveredState coloring to prevent flashing
+        
+        stateElements.forEach((element: any) => {
+          element.setAttribute('fill', color)
+          element.setAttribute('stroke', '#374151')
+          element.setAttribute('stroke-width', '2')
+          element.setAttribute('stroke-opacity', '1')
+          element.style.fill = color
+        })
       })
-    })
-  }, [highlightedState, hoveredState, correctStates, incorrectStates])
+
+      // Multiple approaches to force visual update
+      setTimeout(() => {
+        // Method 1: Mouse events on the highlighted state
+        const targetStateElement = highlightedState ? 
+          svgElement.querySelector(`.${highlightedState.toLowerCase()}`) : 
+          svgElement.querySelector('.ct')
+        
+        if (targetStateElement) {
+          targetStateElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+          setTimeout(() => {
+            targetStateElement.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }))
+          }, 1)
+        }
+        
+        // Method 2: Force layout recalculation
+        svgElement.style.transform = 'translateZ(0)'
+        setTimeout(() => {
+          svgElement.style.transform = ''
+        }, 1)
+        
+        // Method 3: Brief opacity change as backup
+        setTimeout(() => {
+          svgElement.style.opacity = '0.99'
+          setTimeout(() => {
+            svgElement.style.opacity = '1'
+          }, 1)
+        }, 10)
+      }, 50)
+      
+      return true
+    }
+
+    // Single retry after a delay
+    if (!updateColors()) {
+      setTimeout(updateColors, 200)
+    }
+  }, [highlightedState, correctStates, incorrectStates, renderKey])
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full" key={`map-${renderKey}`}>
       <div className="relative bg-gradient-to-b from-sky-100 to-blue-200 rounded-lg border-2 border-gray-300 shadow-lg p-2 h-full">
         <div 
-          className="w-full h-full flex items-center justify-center overflow-hidden"
+          className="w-full h-full flex items-center justify-center overflow-hidden relative"
           style={{ 
             filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))',
             minHeight: '400px',

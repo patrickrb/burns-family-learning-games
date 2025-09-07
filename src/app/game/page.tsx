@@ -48,6 +48,8 @@ export default function GamePage() {
     gameComplete: false,
   })
 
+  const [mapRenderKey, setMapRenderKey] = useState<number>(0)
+
   const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" | null }>({
     message: "",
     type: null,
@@ -112,6 +114,9 @@ export default function GamePage() {
       selectedStates: [...prev.selectedStates, selectedStateId],
     }))
 
+    // Force map re-render
+    setMapRenderKey(prev => prev + 1)
+
     if (isCorrect) {
       const currentStateName = northeastStates.find(s => s.id === gameState.currentStateId)?.name
       setFeedback({
@@ -122,6 +127,8 @@ export default function GamePage() {
       // Move to next state after a delay
       setTimeout(() => {
         nextState()
+        // Force map re-render when moving to next state
+        setMapRenderKey(prev => prev + 1)
       }, 1500)
     } else {
       const selectedStateName = northeastStates.find(s => s.id === selectedStateId)?.name
@@ -295,6 +302,7 @@ export default function GamePage() {
               onStateClick={handleStateSelect}
               correctStates={gameState.correctStates}
               incorrectStates={gameState.incorrectStates}
+              renderKey={mapRenderKey}
             />
           </div>
 

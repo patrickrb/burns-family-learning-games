@@ -96,16 +96,28 @@ export default function USMap({
             svgElement.setAttribute('height', '100%')
             svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet')
 
-            // Set up event listeners for northeast states
-            northeastStates.forEach(stateId => {
-              const stateClass = stateId.toLowerCase()
-              const stateElement = svgElement.querySelector(`.${stateClass}`)
-              
-              if (stateElement) {
+            // Hide all non-northeast states and setup northeast states
+            const allStatePaths = svgElement.querySelectorAll('path[class]')
+            allStatePaths.forEach(stateElement => {
+              const stateClass = stateElement.getAttribute('class')
+              if (stateClass && !northeastStates.some(ne => stateClass === ne.toLowerCase())) {
+                // Hide non-northeast states
+                stateElement.style.display = 'none'
+              } else if (stateClass && northeastStates.some(ne => stateClass === ne.toLowerCase())) {
+                // Set up northeast states
+                const stateId = stateClass.toUpperCase()
+                
                 stateElement.addEventListener('mouseenter', () => setHoveredState(stateId))
                 stateElement.addEventListener('mouseleave', () => setHoveredState(null))
                 stateElement.addEventListener('click', () => onStateClick?.(stateId))
                 stateElement.style.cursor = 'pointer'
+                
+                // Add visible borders with !important to override SVG styles
+                stateElement.style.setProperty('stroke', '#374151', 'important')
+                stateElement.style.setProperty('stroke-width', '2', 'important')
+                stateElement.style.setProperty('stroke-linejoin', 'round', 'important')
+                stateElement.style.setProperty('stroke-linecap', 'round', 'important')
+                stateElement.style.setProperty('stroke-opacity', '1', 'important')
               }
             })
           }
@@ -123,15 +135,15 @@ export default function USMap({
     const svgElement = containerRef.current.querySelector('svg')
     if (!svgElement) return
 
-    // Update northeast states colors
+    // Update northeast states colors - update ALL elements with northeast state classes
     northeastStates.forEach(stateId => {
       const stateClass = stateId.toLowerCase()
-      const stateElement = svgElement.querySelector(`.${stateClass}`)
+      const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
       
-      if (stateElement) {
+      stateElements.forEach(stateElement => {
         const color = getStateColor(stateId)
         stateElement.setAttribute('fill', color)
-      }
+      })
     })
   }, [highlightedState, hoveredState, correctStates, incorrectStates])
 

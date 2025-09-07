@@ -68,6 +68,11 @@ export default function USMap({
     setPan({ x: 0, y: 0 })
   }
 
+  // Track SVG load state
+  const [svgLoaded, setSvgLoaded] = useState(false)
+  // Track state positions for React-controlled highlighting
+  const [statePositions, setStatePositions] = useState<Record<string, { x: number, y: number, width: number, height: number }>>({})
+
   // Load and setup SVG when component mounts
   useEffect(() => {
     fetch('/map.svg')
@@ -107,6 +112,29 @@ export default function USMap({
                 stateElement.style.setProperty('stroke-opacity', '1', 'important')
               }
             })
+            
+            // Calculate state positions for overlay system
+            const positions: Record<string, { x: number, y: number, width: number, height: number }> = {}
+            northeastStates.forEach(stateId => {
+              const stateClass = stateId.toLowerCase()
+              const stateElement = svgElement.querySelector(`.${stateClass}`)
+              if (stateElement) {
+                const bbox = stateElement.getBBox()
+                positions[stateId] = {
+                  x: bbox.x,
+                  y: bbox.y,
+                  width: bbox.width,
+                  height: bbox.height
+                }
+              }
+            })
+            setStatePositions(positions)
+            
+            // Mark SVG as loaded with a small delay to ensure DOM is ready
+            setTimeout(() => {
+              setSvgLoaded(true)
+              console.log('🚀 SVG loaded with state positions calculated')
+            }, 100)
           }
         }
       })
@@ -115,15 +143,19 @@ export default function USMap({
       })
   }, [onStateClick])
 
-  // Update colors when game state changes
+  // Simple SVG color updates - no highlighting in SVG (React overlay handles that)
   useEffect(() => {
-    const updateColors = () => {
-      if (!containerRef.current) return false
+    if (!svgLoaded) return
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return
 
       const svgElement = containerRef.current.querySelector('svg')
-      if (!svgElement) return false
+      if (!svgElement) return
 
-      // Update each state's color directly
+      console.log(`🎨 Updating SVG colors (no highlighting) for renderKey ${renderKey}`)
+
+      // Update states - including yellow highlighting as backup
       northeastStates.forEach(stateId => {
         const stateClass = stateId.toLowerCase()
         const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
@@ -135,56 +167,22 @@ export default function USMap({
         } else if (incorrectStates.includes(stateId)) {
           color = '#ef4444' // red
         } else if (highlightedState === stateId) {
-          color = '#ffff00' // bright yellow
+          color = '#ffff00' // bright yellow - backup highlighting
+          console.log(`⭐ Setting ${stateId} to YELLOW in SVG as backup`)
         }
-        // Remove hoveredState coloring to prevent flashing
         
         stateElements.forEach((element: any) => {
           element.setAttribute('fill', color)
+          element.style.fill = color
           element.setAttribute('stroke', '#374151')
           element.setAttribute('stroke-width', '2')
           element.setAttribute('stroke-opacity', '1')
-          element.style.fill = color
         })
       })
+    }, 50)
 
-      // Multiple approaches to force visual update
-      setTimeout(() => {
-        // Method 1: Mouse events on the highlighted state
-        const targetStateElement = highlightedState ? 
-          svgElement.querySelector(`.${highlightedState.toLowerCase()}`) : 
-          svgElement.querySelector('.ct')
-        
-        if (targetStateElement) {
-          targetStateElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
-          setTimeout(() => {
-            targetStateElement.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }))
-          }, 1)
-        }
-        
-        // Method 2: Force layout recalculation
-        svgElement.style.transform = 'translateZ(0)'
-        setTimeout(() => {
-          svgElement.style.transform = ''
-        }, 1)
-        
-        // Method 3: Brief opacity change as backup
-        setTimeout(() => {
-          svgElement.style.opacity = '0.99'
-          setTimeout(() => {
-            svgElement.style.opacity = '1'
-          }, 1)
-        }, 10)
-      }, 50)
-      
-      return true
-    }
-
-    // Single retry after a delay
-    if (!updateColors()) {
-      setTimeout(updateColors, 200)
-    }
-  }, [highlightedState, correctStates, incorrectStates, renderKey])
+    return () => clearTimeout(timer)
+  }, [svgLoaded, highlightedState, correctStates, incorrectStates, renderKey])
 
   return (
     <div className="w-full h-full" key={`map-${renderKey}`}>
@@ -213,6 +211,34 @@ export default function USMap({
               transformOrigin: 'center center'
             }}
           />
+          
+          {/* Simplified yellow highlight overlay - just show it in center for now */}
+          {highlightedState && (
+            <div
+              className="absolute pointer-events-none animate-pulse z-10 bg-yellow-400 bg-opacity-70 border-2 border-yellow-500 rounded flex items-center justify-center font-bold text-black"
+              style={{
+                left: '50%',
+                top: '20%',
+                width: '120px',
+                height: '40px',
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              Find {highlightedState}!
+            </div>
+          )}
+          
+          {/* Debug info */}
+          {highlightedState && (
+            <div className="absolute top-2 left-2 bg-black text-white p-2 text-xs z-20">
+              Highlighting: {highlightedState}
+              <br />
+              Has positions: {statePositions[highlightedState] ? 'Yes' : 'No'}
+              <br />
+              Position: {statePositions[highlightedState] ? `${Math.round(statePositions[highlightedState].x)}, ${Math.round(statePositions[highlightedState].y)}` : 'None'}
+            </div>
+          )}
+          
         </div>
 
         {/* Zoom Controls */}

@@ -122,22 +122,18 @@ export default function GamePage() {
     
     console.log(`🎯 State selected: ${selectedStateId}, Current target: ${gameState.currentStateId}, Correct: ${isCorrect}`)
     
-    setGameState(prev => ({
-      ...prev,
-      attempts: prev.attempts + 1,
-      correctAnswers: isCorrect ? prev.correctAnswers + 1 : prev.correctAnswers,
-      score: isCorrect ? prev.score + 10 : prev.score,
-      correctStates: isCorrect 
-        ? [...prev.correctStates, selectedStateId]
-        : prev.correctStates,
-      incorrectStates: !isCorrect 
-        ? [...prev.incorrectStates, selectedStateId]
-        : prev.incorrectStates,
-      selectedStates: [...prev.selectedStates, selectedStateId],
-    }))
-
-    // Force map re-render
-    setMapRenderKey(prev => prev + 1)
+    // Handle incorrect answers immediately
+    if (!isCorrect) {
+      setGameState(prev => ({
+        ...prev,
+        attempts: prev.attempts + 1,
+        incorrectStates: [...prev.incorrectStates, selectedStateId],
+        selectedStates: [...prev.selectedStates, selectedStateId],
+      }))
+      
+      // Force map re-render
+      setMapRenderKey(prev => prev + 1)
+    }
 
     if (isCorrect) {
       const currentStateName = northeastStates.find(s => s.id === gameState.currentStateId)?.name
@@ -149,6 +145,20 @@ export default function GamePage() {
       const updatedCorrectStates = [...gameState.correctStates, selectedStateId]
       console.log(`✅ Correct answer! ${selectedStateId} added to completed states.`)
       console.log(`📈 New completed states: [${updatedCorrectStates.join(', ')}]`)
+      
+      // Immediately clear the current target to avoid yellow flashing
+      setGameState(prev => ({
+        ...prev,
+        currentStateId: "", // Clear immediately to prevent yellow flash
+        attempts: prev.attempts + 1,
+        correctAnswers: prev.correctAnswers + 1,
+        score: prev.score + 10,
+        correctStates: updatedCorrectStates,
+        selectedStates: [...prev.selectedStates, selectedStateId],
+      }))
+      
+      // Force map re-render to show green state without yellow flash
+      setMapRenderKey(prev => prev + 1)
       
       // Move to next state after a delay, passing the updated correct states
       setTimeout(() => {

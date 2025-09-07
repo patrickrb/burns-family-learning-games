@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# States Learning Game
+
+An educational web-based game built with Next.js that helps kids learn US states, their capitals, and abbreviations through interactive gameplay.
+
+## Features
+
+- 🗺️ **Interactive Map**: SVG-based US map with clickable states
+- 🎯 **Educational Focus**: Learn state names, locations, and abbreviations
+- 👤 **User Authentication**: Simple login system to track progress
+- 📊 **Progress Tracking**: Monitor scores, attempts, and accuracy
+- 🏆 **Regional Learning**: Currently focuses on Northeast states
+- 📱 **Responsive Design**: Works on desktop and mobile devices
+
+## Current Coverage
+
+### Northeast States (11 states):
+- Connecticut (CT)
+- Delaware (DE)
+- Maine (ME)
+- Maryland (MD)
+- Massachusetts (MA)
+- New Hampshire (NH)
+- New Jersey (NJ)
+- New York (NY)
+- Pennsylvania (PA)
+- Rhode Island (RI)
+- Vermont (VT)
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Components**: shadcn/ui
+- **Authentication**: NextAuth.js
+- **Database**: SQLite with Prisma ORM
 
 ## Getting Started
 
-First, run the development server:
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+2. **Set up the database**:
+   ```bash
+   npx prisma migrate dev --name init
+   ```
+
+3. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser** and navigate to `http://localhost:3000`
+
+## Environment Variables
+
+Create a `.env.local` file with:
+
+```
+NEXTAUTH_SECRET=your-secret-key-here
+NEXTAUTH_URL=http://localhost:3000
+DATABASE_URL="file:./dev.db"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Game Flow
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Landing Page**: Introduction and game overview
+2. **Sign In**: Simple authentication with name and email
+3. **Game Page**: 
+   - Interactive map shows highlighted state
+   - Player clicks on the correct state name from a list
+   - Real-time feedback and scoring
+   - Progress tracking throughout the session
+4. **Completion**: Final score and accuracy statistics
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Future Enhancements
 
-## Learn More
+- Additional US regions (Southeast, Midwest, West, Southwest)
+- Multiple difficulty levels (capitals, abbreviations)
+- Time-based challenges
+- Leaderboards and achievements
+- More detailed progress analytics
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # API routes
+│   ├── auth/              # Authentication pages
+│   └── game/              # Main game page
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   ├── us-map.tsx        # Interactive map component
+│   └── state-list.tsx    # State selection component
+└── lib/                   # Utility functions and configurations
+    ├── auth.ts           # NextAuth configuration
+    └── utils.ts          # Utility functions
+```

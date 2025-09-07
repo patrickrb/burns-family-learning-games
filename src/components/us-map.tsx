@@ -68,10 +68,50 @@ export default function USMap({
     setPan({ x: 0, y: 0 })
   }
 
-  // Track SVG load state
+  // Track SVG load state and force updates
   const [svgLoaded, setSvgLoaded] = useState(false)
+  const [lastHighlightedState, setLastHighlightedState] = useState<string | undefined>()
   // Track state positions for React-controlled highlighting
   const [statePositions, setStatePositions] = useState<Record<string, { x: number, y: number, width: number, height: number }>>({})
+
+  // Force re-render when highlighted state changes
+  useEffect(() => {
+    if (highlightedState !== lastHighlightedState) {
+      console.log(`🔄 Highlighted state changed: ${lastHighlightedState} → ${highlightedState}`)
+      setLastHighlightedState(highlightedState)
+      
+      // Force immediate update if SVG is already loaded
+      if (svgLoaded && containerRef.current) {
+        const svgElement = containerRef.current.querySelector('svg')
+        if (svgElement && highlightedState) {
+          // Immediate highlight application with retry
+          const applyImmediateHighlight = () => {
+            const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
+            if (targetElements.length > 0) {
+              console.log(`⚡ Applying immediate highlight to ${highlightedState}`)
+              targetElements.forEach((element: any) => {
+                // Clear any existing conflicting styles
+                element.removeAttribute('style')
+                element.removeAttribute('fill')
+                
+                // Apply yellow highlighting immediately
+                element.style.setProperty('fill', '#ffff00', 'important')
+                element.style.setProperty('stroke', '#374151', 'important')
+                element.style.setProperty('stroke-width', '2px', 'important')
+                element.setAttribute('fill', '#ffff00')
+              })
+            } else {
+              console.warn(`⚠️ No elements found for immediate highlight of ${highlightedState}`)
+            }
+          }
+          
+          // Apply immediately and also with a small delay as backup
+          applyImmediateHighlight()
+          setTimeout(applyImmediateHighlight, 10)
+        }
+      }
+    }
+  }, [highlightedState, lastHighlightedState, svgLoaded])
 
   // Load and setup SVG when component mounts
   useEffect(() => {
@@ -91,10 +131,12 @@ export default function USMap({
             // Hide all non-northeast states and setup northeast states
             const allStatePaths = svgElement.querySelectorAll('path[class]')
             allStatePaths.forEach(stateElement => {
+              const htmlElement = stateElement as HTMLElement
+              const svgElement = stateElement as SVGElement
               const stateClass = stateElement.getAttribute('class')
               if (stateClass && !northeastStates.some(ne => stateClass === ne.toLowerCase())) {
                 // Hide non-northeast states
-                stateElement.style.display = 'none'
+                htmlElement.style.display = 'none'
               } else if (stateClass && northeastStates.some(ne => stateClass === ne.toLowerCase())) {
                 // Set up northeast states
                 const stateId = stateClass.toUpperCase()
@@ -102,14 +144,14 @@ export default function USMap({
                 stateElement.addEventListener('mouseenter', () => setHoveredState(stateId))
                 stateElement.addEventListener('mouseleave', () => setHoveredState(null))
                 stateElement.addEventListener('click', () => onStateClick?.(stateId))
-                stateElement.style.cursor = 'pointer'
+                htmlElement.style.cursor = 'pointer'
                 
                 // Add visible borders with !important to override SVG styles
-                stateElement.style.setProperty('stroke', '#374151', 'important')
-                stateElement.style.setProperty('stroke-width', '2', 'important')
-                stateElement.style.setProperty('stroke-linejoin', 'round', 'important')
-                stateElement.style.setProperty('stroke-linecap', 'round', 'important')
-                stateElement.style.setProperty('stroke-opacity', '1', 'important')
+                htmlElement.style.setProperty('stroke', '#374151', 'important')
+                htmlElement.style.setProperty('stroke-width', '2', 'important')
+                htmlElement.style.setProperty('stroke-linejoin', 'round', 'important')
+                htmlElement.style.setProperty('stroke-linecap', 'round', 'important')
+                htmlElement.style.setProperty('stroke-opacity', '1', 'important')
               }
             })
             
@@ -117,8 +159,8 @@ export default function USMap({
             const positions: Record<string, { x: number, y: number, width: number, height: number }> = {}
             northeastStates.forEach(stateId => {
               const stateClass = stateId.toLowerCase()
-              const stateElement = svgElement.querySelector(`.${stateClass}`)
-              if (stateElement) {
+              const stateElement = svgElement.querySelector(`.${stateClass}`) as SVGGraphicsElement
+              if (stateElement && stateElement.getBBox) {
                 const bbox = stateElement.getBBox()
                 positions[stateId] = {
                   x: bbox.x,
@@ -134,6 +176,7 @@ export default function USMap({
             setTimeout(() => {
               setSvgLoaded(true)
               console.log('🚀 SVG loaded with state positions calculated')
+              console.log(`📊 Found ${Object.keys(positions).length} northeast states in SVG`)
             }, 100)
           }
         }
@@ -143,44 +186,124 @@ export default function USMap({
       })
   }, [onStateClick])
 
-  // Simple SVG color updates - no highlighting in SVG (React overlay handles that)
+  // Robust SVG color updates with better error handling
   useEffect(() => {
     if (!svgLoaded) return
 
-    const timer = setTimeout(() => {
+    const updateColors = () => {
       if (!containerRef.current) return
-
       const svgElement = containerRef.current.querySelector('svg')
       if (!svgElement) return
 
-      console.log(`🎨 Updating SVG colors (no highlighting) for renderKey ${renderKey}`)
-
-      // Update states - including yellow highlighting as backup
+      console.log(`🎨 Updating colors for renderKey ${renderKey}, highlighting: "${highlightedState}"`)
+      
+      // Process each state with priority-based coloring
       northeastStates.forEach(stateId => {
         const stateClass = stateId.toLowerCase()
         const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
         
+        if (stateElements.length === 0) {
+          console.warn(`⚠️ No elements found for state: ${stateId}`)
+          return
+        }
+
+        // Determine color with clear priority order
         let color = '#ffffff' // default white
+        let priority = 0
         
         if (correctStates.includes(stateId)) {
           color = '#10b981' // green
+          priority = 1
         } else if (incorrectStates.includes(stateId)) {
-          color = '#ef4444' // red
+          color = '#ef4444' // red  
+          priority = 2
         } else if (highlightedState === stateId) {
-          color = '#ffff00' // bright yellow - backup highlighting
-          console.log(`⭐ Setting ${stateId} to YELLOW in SVG as backup`)
+          color = '#ffff00' // bright yellow - highest priority
+          priority = 3
+          console.log(`⭐ Setting ${stateId} to YELLOW (priority ${priority})`)
         }
         
+        // Apply styling to all elements for this state
         stateElements.forEach((element: any) => {
+          // Store the priority to avoid conflicts
+          element.dataset.colorPriority = priority.toString()
+          
+          // Comprehensive style clearing
+          element.removeAttribute('style')
+          element.removeAttribute('fill')
+          element.style.cssText = '' // Clear any existing CSS
+          
+          // Apply new styles with multiple methods for maximum compatibility
           element.setAttribute('fill', color)
-          element.style.fill = color
           element.setAttribute('stroke', '#374151')
           element.setAttribute('stroke-width', '2')
           element.setAttribute('stroke-opacity', '1')
+          
+          // Force with CSS - use requestAnimationFrame for better timing
+          requestAnimationFrame(() => {
+            element.style.setProperty('fill', color, 'important')
+            element.style.setProperty('stroke', '#374151', 'important')
+            element.style.setProperty('stroke-width', '2px', 'important')
+            element.style.setProperty('stroke-opacity', '1', 'important')
+          })
+          
+          console.log(`  → ${stateId} set to ${color} (priority: ${priority})`)
         })
       })
-    }, 50)
+    }
 
+    // Multiple update attempts with increasing delays for reliability
+    const updateWithRetry = () => {
+      updateColors()
+      
+      // If we have a highlighted state, verify it was applied and retry if needed
+      if (highlightedState) {
+        const verifyAndRetry = (attempt: number = 1) => {
+          if (attempt > 3) return // Max 3 attempts
+          
+          setTimeout(() => {
+            const svgElement = containerRef.current?.querySelector('svg')
+            if (!svgElement) return
+            
+            const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
+            if (targetElements.length === 0) return
+            
+            const element = targetElements[0] as any
+            const computedStyle = window.getComputedStyle(element)
+            const actualFill = computedStyle.fill
+            const isYellow = actualFill === 'rgb(255, 255, 0)' || actualFill === '#ffff00' || actualFill === 'yellow'
+            
+            if (!isYellow) {
+              console.log(`🔧 Retry ${attempt}: ${highlightedState} not yellow (${actualFill}), retrying...`)
+              
+              // Force a more aggressive update
+              targetElements.forEach((el: any) => {
+                el.style.cssText = ''
+                el.removeAttribute('fill')
+                // Use requestAnimationFrame for better timing
+                requestAnimationFrame(() => {
+                  el.style.setProperty('fill', '#ffff00', 'important')
+                  el.style.setProperty('stroke', '#374151', 'important')
+                  el.style.setProperty('stroke-width', '2px', 'important')
+                  el.setAttribute('fill', '#ffff00')
+                })
+              })
+              
+              // Try again if still not working
+              verifyAndRetry(attempt + 1)
+            } else {
+              console.log(`✅ ${highlightedState} successfully highlighted yellow on attempt ${attempt}`)
+            }
+          }, attempt * 150) // Increasing delays: 150ms, 300ms, 450ms
+        }
+        
+        verifyAndRetry()
+      }
+    }
+
+    // Initial update with small delay
+    const timer = setTimeout(updateWithRetry, 50)
+    
     return () => clearTimeout(timer)
   }, [svgLoaded, highlightedState, correctStates, incorrectStates, renderKey])
 
@@ -212,32 +335,6 @@ export default function USMap({
             }}
           />
           
-          {/* Simplified yellow highlight overlay - just show it in center for now */}
-          {highlightedState && (
-            <div
-              className="absolute pointer-events-none animate-pulse z-10 bg-yellow-400 bg-opacity-70 border-2 border-yellow-500 rounded flex items-center justify-center font-bold text-black"
-              style={{
-                left: '50%',
-                top: '20%',
-                width: '120px',
-                height: '40px',
-                transform: 'translate(-50%, -50%)'
-              }}
-            >
-              Find {highlightedState}!
-            </div>
-          )}
-          
-          {/* Debug info */}
-          {highlightedState && (
-            <div className="absolute top-2 left-2 bg-black text-white p-2 text-xs z-20">
-              Highlighting: {highlightedState}
-              <br />
-              Has positions: {statePositions[highlightedState] ? 'Yes' : 'No'}
-              <br />
-              Position: {statePositions[highlightedState] ? `${Math.round(statePositions[highlightedState].x)}, ${Math.round(statePositions[highlightedState].y)}` : 'None'}
-            </div>
-          )}
           
         </div>
 

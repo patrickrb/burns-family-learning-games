@@ -57,34 +57,54 @@ export default function GamePage() {
 
   // Allow guest play - no redirect needed
 
-  // Initialize game with random state
-  const getRandomState = useCallback(() => {
+  // Initialize game with random state that hasn't been completed
+  const getRandomState = useCallback((currentCorrectStates: string[] = []) => {
     const availableStates = northeastStates.filter(
-      (state) => !gameState.correctStates.includes(state.id)
+      (state) => !currentCorrectStates.includes(state.id)
     )
     if (availableStates.length === 0) return null
     const randomIndex = Math.floor(Math.random() * availableStates.length)
     return availableStates[randomIndex].id
-  }, [gameState.correctStates])
-
-  const initializeGame = useCallback(() => {
-    const firstState = northeastStates[Math.floor(Math.random() * northeastStates.length)]
-    setGameState(prev => ({
-      ...prev,
-      currentStateId: firstState.id,
-      gameComplete: false,
-    }))
   }, [])
 
-  const nextState = useCallback(() => {
-    const nextStateId = getRandomState()
+  const initializeGame = useCallback(() => {
+    // Reset game state first
+    const resetGameState = {
+      currentStateId: "",
+      score: 0,
+      attempts: 0,
+      correctAnswers: 0,
+      correctStates: [],
+      incorrectStates: [],
+      selectedStates: [],
+      gameComplete: false,
+    }
+    
+    // Pick a random first state from all available states
+    const firstState = northeastStates[Math.floor(Math.random() * northeastStates.length)]
+    
+    setGameState({
+      ...resetGameState,
+      currentStateId: firstState.id,
+    })
+    
+    console.log(`🎮 Game initialized with first state: ${firstState.id} (${firstState.name})`)
+  }, [])
+
+    const nextState = useCallback((updatedCorrectStates: string[]) => {
+    const nextStateId = getRandomState(updatedCorrectStates)
     if (nextStateId) {
+      console.log(`➡️ Moving to next state: ${nextStateId}`)
+      console.log(`📊 Completed states: [${updatedCorrectStates.join(', ')}]`)
+      console.log(`🎯 Remaining states: ${northeastStates.filter(s => !updatedCorrectStates.includes(s.id)).map(s => s.id).join(', ')}`)
+      
       setGameState(prev => ({
         ...prev,
         currentStateId: nextStateId,
       }))
       setFeedback({ message: "", type: null })
     } else {
+      console.log(`🎉 Game completed! All ${updatedCorrectStates.length} states completed.`)
       setGameState(prev => ({
         ...prev,
         gameComplete: true,
@@ -99,6 +119,8 @@ export default function GamePage() {
 
   const handleStateSelect = async (selectedStateId: string) => {
     const isCorrect = selectedStateId === gameState.currentStateId
+    
+    console.log(`🎯 State selected: ${selectedStateId}, Current target: ${gameState.currentStateId}, Correct: ${isCorrect}`)
     
     setGameState(prev => ({
       ...prev,
@@ -124,9 +146,13 @@ export default function GamePage() {
         type: "success"
       })
       
-      // Move to next state after a delay
+      const updatedCorrectStates = [...gameState.correctStates, selectedStateId]
+      console.log(`✅ Correct answer! ${selectedStateId} added to completed states.`)
+      console.log(`📈 New completed states: [${updatedCorrectStates.join(', ')}]`)
+      
+      // Move to next state after a delay, passing the updated correct states
       setTimeout(() => {
-        nextState()
+        nextState(updatedCorrectStates)
         // Force map re-render when moving to next state
         setMapRenderKey(prev => prev + 1)
       }, 1500)
@@ -137,6 +163,8 @@ export default function GamePage() {
         message: `That's ${selectedStateName}. The highlighted state is ${currentStateName}. Try again!`,
         type: "error"
       })
+      
+      console.log(`❌ Incorrect answer. Target remains: ${gameState.currentStateId}`)
       
       // Clear feedback after delay but don't move to next state
       setTimeout(() => {
@@ -164,6 +192,7 @@ export default function GamePage() {
   }
 
   const resetGame = () => {
+    console.log(`🔄 Resetting game...`)
     setGameState({
       currentStateId: "",
       score: 0,
@@ -175,6 +204,7 @@ export default function GamePage() {
       gameComplete: false,
     })
     setFeedback({ message: "", type: null })
+    setMapRenderKey(prev => prev + 1)
     initializeGame()
   }
 

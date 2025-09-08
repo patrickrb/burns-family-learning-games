@@ -85,17 +85,11 @@ export default function GamePage() {
       ...resetGameState,
       currentStateId: firstState.id,
     })
-    
-    console.log(`🎮 Game initialized with first state: ${firstState.id} (${firstState.name})`)
   }, [])
 
     const nextState = useCallback((updatedCorrectStates: string[]) => {
     const nextStateId = getRandomState(updatedCorrectStates)
     if (nextStateId) {
-      console.log(`➡️ Moving to next state: ${nextStateId}`)
-      console.log(`📊 Completed states: [${updatedCorrectStates.join(', ')}]`)
-      console.log(`🎯 Remaining states: ${northeastStates.filter(s => !updatedCorrectStates.includes(s.id)).map(s => s.id).join(', ')}`)
-      
       // First set the new target state
       setGameState(prev => ({
         ...prev,
@@ -104,7 +98,6 @@ export default function GamePage() {
       
       // Then clear incorrect states after a small delay to ensure highlighting takes effect first
       setTimeout(() => {
-        console.log(`🧹 Clearing incorrectStates for new round with target: ${nextStateId}`)
         setGameState(prev => ({
           ...prev,
           incorrectStates: [], // Clear incorrect states for the new round
@@ -112,7 +105,6 @@ export default function GamePage() {
       }, 50)
       setFeedback({ message: "", type: null })
     } else {
-      console.log(`🎉 Game completed! All ${updatedCorrectStates.length} states completed.`)
       setGameState(prev => ({
         ...prev,
         gameComplete: true,
@@ -128,14 +120,8 @@ export default function GamePage() {
   const handleStateSelect = async (selectedStateId: string) => {
     const isCorrect = selectedStateId === gameState.currentStateId
     
-    console.log(`🎯 State selected: ${selectedStateId}, Current target: ${gameState.currentStateId}, Correct: ${isCorrect}`)
-    
     // Handle incorrect answers immediately
     if (!isCorrect) {
-      console.log(`❌ Incorrect answer: ${selectedStateId}`)
-      console.log(`📊 Current incorrectStates: [${gameState.incorrectStates.join(',')}]`)
-      console.log(`📊 Current correctStates: [${gameState.correctStates.join(',')}]`)
-      
       // Only add to incorrectStates if not already there (avoid duplicates)
       const newIncorrectStates = gameState.incorrectStates.includes(selectedStateId) 
         ? gameState.incorrectStates 
@@ -147,8 +133,6 @@ export default function GamePage() {
         incorrectStates: newIncorrectStates,
         selectedStates: [...prev.selectedStates, selectedStateId],
       }))
-      
-      console.log(`📊 New incorrectStates: [${newIncorrectStates.join(',')}]`)
     }
 
     if (isCorrect) {
@@ -159,8 +143,6 @@ export default function GamePage() {
       })
       
       const updatedCorrectStates = [...gameState.correctStates, selectedStateId]
-      console.log(`✅ Correct answer! ${selectedStateId} added to completed states.`)
-      console.log(`📈 New completed states: [${updatedCorrectStates.join(', ')}]`)
       
       // Immediately clear the current target to avoid yellow flashing
       setGameState(prev => ({
@@ -188,8 +170,6 @@ export default function GamePage() {
         type: "error"
       })
       
-      console.log(`❌ Incorrect answer. Target remains: ${gameState.currentStateId}`)
-      
       // Clear feedback after delay but don't move to next state
       setTimeout(() => {
         setFeedback({ message: "", type: null })
@@ -210,13 +190,12 @@ export default function GamePage() {
           }),
         })
       } catch (error) {
-        console.error("Error saving progress:", error)
+        // Error saving progress
       }
     }
   }
 
   const resetGame = () => {
-    console.log(`🔄 Resetting game...`)
     setGameState({
       currentStateId: "",
       score: 0,

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(gameProgress)
   } catch (error) {
-    console.error("Error saving game progress:", error)
+    // Error saving game progress
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(user.gameProgress)
   } catch (error) {
-    console.error("Error fetching game progress:", error)
+    // Error fetching game progress
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

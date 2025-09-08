@@ -28,7 +28,7 @@ export default function SignIn() {
         router.push("/game")
       }
     } catch (error) {
-      console.error("Sign in error:", error)
+      // Sign in error
     } finally {
       setIsLoading(false)
     }

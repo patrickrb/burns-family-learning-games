@@ -38,8 +38,6 @@ export default function StateList({
   incorrectStates,
   disabled = false
 }: StateListProps) {
-  console.log(`📋 StateList render - correct: [${correctStates.join(',')}], incorrect: [${incorrectStates.join(',')}], disabled: ${disabled}`)
-  
   const getButtonVariant = (stateId: string) => {
     // Priority order: correct > incorrect > default outline
     // Note: We removed selectedStates check because it was interfering with states returning to default styling
@@ -59,13 +57,6 @@ export default function StateList({
     // 2. State is currently correct (should remain green and disabled), OR  
     // 3. State is currently incorrect (should remain red and disabled)
     const result = disabled || correctStates.includes(stateId) || incorrectStates.includes(stateId)
-    console.log(`🔍 StateList - ${stateId} disabled check:`, {
-      disabled,
-      inCorrect: correctStates.includes(stateId),
-      inIncorrect: incorrectStates.includes(stateId),
-      result,
-      arrays: { correct: correctStates, incorrect: incorrectStates }
-    })
     return result
   }
 

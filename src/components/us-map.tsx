@@ -11,7 +11,19 @@ interface USMapProps {
 
 // Northeast states we want to make interactive
 const northeastStates = [
-  'CT', 'DE', 'ME', 'MD', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'
+  'CT            svgElement.style.setProperty('stroke-opacity', '1', 'important')
+            
+            changesApplied++
+          }
+        })
+      })
+      
+      // Alert if many states are being whitened - this indicates a problem
+      if (whitedOut > 5) {
+      }
+      
+      return true
+    }', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'
 ]
 
 export default function USMap({ 
@@ -91,7 +103,6 @@ export default function USMap({
           const neY = minY - padding
           
           svgElement.setAttribute('viewBox', `${neX} ${neY} ${neWidth} ${neHeight}`)
-          console.log('🔄 Reset to Northeast view')
         }
       }
     }
@@ -106,12 +117,8 @@ export default function USMap({
   // Track highlighted state changes for logging
   useEffect(() => {
     if (highlightedState !== lastHighlightedState) {
-      console.log(`🔄 Highlighted state changed: "${lastHighlightedState}" → "${highlightedState}"`)
-      
       // Special logging for problematic transitions
       if (lastHighlightedState && !highlightedState) {
-        console.warn(`🚨 HIGHLIGHT CLEARED: Previous="${lastHighlightedState}" → New="${highlightedState}"`)
-        console.warn(`📊 At clear time - correct: [${correctStates.join(',')}], incorrect: [${incorrectStates.join(',')}]`)
       }
       
       setLastHighlightedState(highlightedState)
@@ -122,11 +129,9 @@ export default function USMap({
   // Load and setup SVG when component mounts
   useEffect(() => {
     if (svgLoaded) {
-      console.log('🚫 SVG already loaded, skipping reload')
       return
     }
     
-    console.log('📥 Starting SVG load...')
     fetch('/map.svg')
       .then(response => response.text())
       .then(svgText => {
@@ -201,30 +206,23 @@ export default function USMap({
               const neY = minY - padding
               
               svgElement.setAttribute('viewBox', `${neX} ${neY} ${neWidth} ${neHeight}`)
-              console.log(`🔍 Set viewBox to focus on Northeast: ${neX} ${neY} ${neWidth} ${neHeight}`)
-              console.log(`📍 Northeast region bounds: x=${minX}-${maxX}, y=${minY}-${maxY}`)
             }
             
             // Mark SVG as loaded with a small delay to ensure DOM is ready
             setTimeout(() => {
               setSvgLoaded(true)
-              console.log('🚀 SVG loaded with state positions calculated and zoomed to Northeast')
-              console.log(`📊 Found ${Object.keys(positions).length} northeast states in SVG`)
             }, 100)
           }
         }
       })
       .catch(error => {
-        console.error('Error loading SVG:', error)
+        // Error loading SVG
       })
   }, [svgLoaded]) // Only reload if svgLoaded changes
 
   // Robust SVG color updates - only change what needs changing
   useEffect(() => {
     if (!svgLoaded) return
-
-    console.log(`🔍 Color update triggered - highlightedState: "${highlightedState}", correctStates: [${correctStates.join(',')}], incorrectStates: [${incorrectStates.join(',')}]`)
-    console.log(`🎯 Highlighted state check: "${highlightedState}" (type: ${typeof highlightedState}, length: ${highlightedState?.length})`)
 
     // Special handling for when highlight is cleared but we have game progress
     const hasGameProgress = correctStates.length > 0 || incorrectStates.length > 0
@@ -237,9 +235,6 @@ export default function USMap({
       JSON.stringify(incorrectStates) !== JSON.stringify(prevIncorrectStatesRef.current)
     
     if (hasGameProgress && highlightCleared && !stateArraysChanged) {
-      console.warn(`⚠️ Highlight cleared during active game with no state changes - preserving existing colors`)
-      console.warn(`📊 Preserving: correct=[${correctStates.join(',')}], incorrect=[${incorrectStates.join(',')}]`)
-      console.warn(`🛑 EARLY RETURN - Not updating colors to prevent wipe`)
       return // Don't update colors at all when highlight is cleared during active game
     }
     
@@ -249,24 +244,18 @@ export default function USMap({
 
     // Also check if this is a fresh SVG load but we have game progress - preserve colors
     if (hasGameProgress && !lastHighlightedState && !highlightedState) {
-      console.warn(`🔄 Fresh SVG load with existing game state - applying preserved colors`)
       // Allow the color update to proceed to restore the correct colors
     }
 
     const updateColors = () => {
       if (!containerRef.current) {
-        console.warn('⚠️ Container ref not available for color update')
         return false
       }
       const svgElement = containerRef.current.querySelector('svg')
       if (!svgElement) {
-        console.warn('⚠️ SVG element not found for color update')
         return false
       }
 
-      console.log(`🎨 Starting color update at ${new Date().toISOString()}`)
-      console.log(`📊 Input states - highlighted: "${highlightedState}", correct: [${correctStates.join(',')}], incorrect: [${incorrectStates.join(',')}]`)
-      
       let changesApplied = 0
       let whitedOut = 0
       
@@ -276,7 +265,6 @@ export default function USMap({
         const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
         
         if (stateElements.length === 0) {
-          console.warn(`⚠️ No elements found for state: ${stateId}`)
           return
         }
 
@@ -288,17 +276,13 @@ export default function USMap({
         if (highlightedState && highlightedState === stateId) {
           targetColor = '#ffff00' // bright yellow - HIGHEST priority
           targetPriority = 3
-          console.log(`⭐ ${stateId} should be YELLOW (highlighted)`)
         } else if (correctStates.includes(stateId)) {
           targetColor = '#10b981' // green - second priority
           targetPriority = 1
-          console.log(`✅ ${stateId} should be GREEN (correct)`)
         } else if (incorrectStates.includes(stateId)) {
           targetColor = '#ef4444' // red - third priority
           targetPriority = 2
-          console.log(`❌ ${stateId} should be RED (incorrect)`)
         } else {
-          console.log(`⚪ ${stateId} should be WHITE (default)`)
           if (targetColor === '#ffffff') {
             whitedOut++
           }
@@ -314,8 +298,6 @@ export default function USMap({
           
           // Only update if something actually needs to change
           if (currentPriority !== targetPriority || currentFill !== targetColor) {
-            console.log(`  🔄 ${stateId}: "${currentFill}" (p${currentPriority}) → "${targetColor}" (p${targetPriority})`)
-            
             // Update the element
             svgElement.dataset.colorPriority = targetPriority.toString()
             svgElement.setAttribute('fill', targetColor)
@@ -330,8 +312,6 @@ export default function USMap({
             svgElement.style.setProperty('stroke-opacity', '1', 'important')
             
             changesApplied++
-          } else {
-            console.log(`  ✓ ${stateId} already correct: "${targetColor}" (p${targetPriority})`)
           }
         })
       })

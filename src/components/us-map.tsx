@@ -11,19 +11,7 @@ interface USMapProps {
 
 // Northeast states we want to make interactive
 const northeastStates = [
-  'CT            svgElement.style.setProperty('stroke-opacity', '1', 'important')
-            
-            changesApplied++
-          }
-        })
-      })
-      
-      // Alert if many states are being whitened - this indicates a problem
-      if (whitedOut > 5) {
-      }
-      
-      return true
-    }', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'
+  'CT', 'DE', 'ME', 'MD', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT'
 ]
 
 export default function USMap({ 
@@ -133,7 +121,9 @@ export default function USMap({
     }
     
     fetch('/map.svg')
-      .then(response => response.text())
+      .then(response => {
+        return response.text()
+      })
       .then(svgText => {
         if (containerRef.current) {
           containerRef.current.innerHTML = svgText
@@ -145,12 +135,29 @@ export default function USMap({
             svgElement.setAttribute('height', '100%')
             svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet')
 
+            // Add CSS to completely disable all tooltips on this SVG
+            const style = document.createElement('style')
+            style.textContent = `
+              svg * {
+                pointer-events: auto !important;
+              }
+              svg *[title]:after,
+              svg *[aria-label]:after,
+              svg title,
+              svg desc {
+                display: none !important;
+                visibility: hidden !important;
+              }
+            `
+            document.head.appendChild(style)
+
             // Hide all non-northeast states and setup northeast states
             const allStatePaths = svgElement.querySelectorAll('path[class]')
             allStatePaths.forEach(stateElement => {
               const htmlElement = stateElement as HTMLElement
               const svgElement = stateElement as SVGElement
               const stateClass = stateElement.getAttribute('class')
+
               if (stateClass && !northeastStates.some(ne => stateClass === ne.toLowerCase())) {
                 // Hide non-northeast states
                 htmlElement.style.display = 'none'
@@ -208,6 +215,57 @@ export default function USMap({
               svgElement.setAttribute('viewBox', `${neX} ${neY} ${neWidth} ${neHeight}`)
             }
             
+            // Remove ALL title elements from the entire SVG to prevent cheating (do this last)
+            const allTitleElements = svgElement.querySelectorAll('title')
+            console.log(`Found ${allTitleElements.length} title elements to remove`)
+            allTitleElements.forEach((titleEl, index) => {
+              console.log(`Removing title ${index + 1}: "${titleEl.textContent}" (id: ${titleEl.id})`)
+              titleEl.remove()
+            })
+            
+            // Also remove desc elements which can also show tooltips
+            const allDescElements = svgElement.querySelectorAll('desc')
+            console.log(`Found ${allDescElements.length} desc elements to remove`)
+            allDescElements.forEach(descEl => descEl.remove())
+            
+            // Also remove any aria-labelledby attributes that might reference titles
+            const allElements = svgElement.querySelectorAll('*')
+            allElements.forEach(el => {
+              if (el.hasAttribute('aria-labelledby')) {
+                el.removeAttribute('aria-labelledby')
+              }
+              if (el.hasAttribute('aria-describedby')) {
+                el.removeAttribute('aria-describedby')
+              }
+            })
+            
+            // Force remove any remaining tooltip-related attributes
+            const allPaths = svgElement.querySelectorAll('path')
+            allPaths.forEach(path => {
+              path.removeAttribute('title')
+              path.removeAttribute('aria-label')
+              path.removeAttribute('data-title')
+              path.removeAttribute('data-original-title')
+              // Remove any child title elements that might have been missed
+              const childTitles = path.querySelectorAll('title')
+              childTitles.forEach(title => title.remove())
+            })
+            
+            // Add a global style to the SVG element itself to disable tooltips
+            svgElement.style.setProperty('pointer-events', 'auto', 'important')
+            svgElement.setAttribute('aria-hidden', 'true')
+            
+            // Double-check removal worked
+            const remainingTitles = svgElement.querySelectorAll('title')
+            const remainingDescs = svgElement.querySelectorAll('desc')
+            console.log(`After removal, ${remainingTitles.length} title elements and ${remainingDescs.length} desc elements remain`)
+            
+            // Log any elements that still have tooltip-related attributes
+            const elementsWithTooltips = svgElement.querySelectorAll('[title], [aria-label], [aria-labelledby], [aria-describedby]')
+            if (elementsWithTooltips.length > 0) {
+              console.warn(`Warning: ${elementsWithTooltips.length} elements still have tooltip attributes:`, elementsWithTooltips)
+            }
+            
             // Mark SVG as loaded with a small delay to ensure DOM is ready
             setTimeout(() => {
               setSvgLoaded(true)
@@ -216,7 +274,7 @@ export default function USMap({
         }
       })
       .catch(error => {
-        // Error loading SVG
+        console.error('Error loading SVG:', error)
       })
   }, [svgLoaded]) // Only reload if svgLoaded changes
 

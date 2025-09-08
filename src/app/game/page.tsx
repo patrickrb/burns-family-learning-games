@@ -17,6 +17,9 @@ interface GameState {
   incorrectStates: string[]
   selectedStates: string[]
   gameComplete: boolean
+  startTime: number | null
+  endTime: number | null
+  elapsedTime: number
 }
 
 const northeastStates = [
@@ -46,12 +49,18 @@ export default function GamePage() {
     incorrectStates: [],
     selectedStates: [],
     gameComplete: false,
+    startTime: null,
+    endTime: null,
+    elapsedTime: 0,
   })
 
   const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" | null }>({
     message: "",
     type: null,
   })
+
+  // Timer state for display
+  const [currentTime, setCurrentTime] = useState<number>(0)
 
   // Allow guest play - no redirect needed
 
@@ -76,6 +85,9 @@ export default function GamePage() {
       incorrectStates: [],
       selectedStates: [],
       gameComplete: false,
+      startTime: Date.now(),
+      endTime: null,
+      elapsedTime: 0,
     }
     
     // Pick a random first state from all available states
@@ -85,6 +97,8 @@ export default function GamePage() {
       ...resetGameState,
       currentStateId: firstState.id,
     })
+    
+    setCurrentTime(0)
   }, [])
 
     const nextState = useCallback((updatedCorrectStates: string[]) => {
@@ -105,9 +119,13 @@ export default function GamePage() {
       }, 50)
       setFeedback({ message: "", type: null })
     } else {
+      // Game complete - record end time
+      const endTime = Date.now()
       setGameState(prev => ({
         ...prev,
         gameComplete: true,
+        endTime: endTime,
+        elapsedTime: prev.startTime ? endTime - prev.startTime : 0,
       }))
     }
   }, [getRandomState])
@@ -116,6 +134,38 @@ export default function GamePage() {
   useEffect(() => {
     initializeGame()
   }, [initializeGame])
+
+  // Timer effect - update current time every second while game is active
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+    
+    if (gameState.startTime && !gameState.gameComplete) {
+      interval = setInterval(() => {
+        const now = Date.now()
+        setCurrentTime(now - gameState.startTime!)
+      }, 100) // Update every 100ms for smooth display
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
+    }
+  }, [gameState.startTime, gameState.gameComplete])
+
+  // Format time for display
+  const formatTime = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000)
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    const ms = Math.floor((milliseconds % 1000) / 10) // Show centiseconds
+    
+    if (minutes > 0) {
+      return `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`
+    } else {
+      return `${seconds}.${ms.toString().padStart(2, '0')}s`
+    }
+  }
 
   const handleStateSelect = async (selectedStateId: string) => {
     const isCorrect = selectedStateId === gameState.currentStateId
@@ -205,8 +255,12 @@ export default function GamePage() {
       incorrectStates: [],
       selectedStates: [],
       gameComplete: false,
+      startTime: null,
+      endTime: null,
+      elapsedTime: 0,
     })
     setFeedback({ message: "", type: null })
+    setCurrentTime(0)
     initializeGame()
   }
 
@@ -216,6 +270,7 @@ export default function GamePage() {
 
   if (gameState.gameComplete) {
     const accuracy = gameState.attempts > 0 ? Math.round((gameState.correctAnswers / gameState.attempts) * 100) : 0
+    const finalTime = gameState.elapsedTime
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -228,7 +283,7 @@ export default function GamePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xl">You have completed the Northeast States game!</p>
-              <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+              <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
                 <div className="bg-blue-100 p-4 rounded">
                   <div className="text-2xl font-bold text-blue-600">{gameState.score}</div>
                   <div className="text-sm text-blue-800">Total Score</div>
@@ -236,6 +291,11 @@ export default function GamePage() {
                 <div className="bg-green-100 p-4 rounded">
                   <div className="text-2xl font-bold text-green-600">{accuracy}%</div>
                   <div className="text-sm text-green-800">Accuracy</div>
+                </div>
+                <div className="bg-purple-100 p-4 rounded col-span-2">
+                  <div className="text-3xl font-bold text-purple-600">{formatTime(finalTime)}</div>
+                  <div className="text-sm text-purple-800">Final Time</div>
+                  <div className="text-xs text-purple-600 mt-1">Can you beat this time?</div>
                 </div>
               </div>
               <div className="text-sm text-gray-600">
@@ -303,6 +363,12 @@ export default function GamePage() {
             <div className="bg-white px-4 py-2 rounded-lg shadow">
               <span className="text-sm text-gray-600">Attempts: </span>
               <span className="font-bold text-gray-800">{gameState.attempts}</span>
+            </div>
+            <div className="bg-white px-4 py-2 rounded-lg shadow">
+              <span className="text-sm text-gray-600">Time: </span>
+              <span className="font-bold text-purple-600">
+                {gameState.startTime ? formatTime(currentTime) : "0.00s"}
+              </span>
             </div>
             {!session && (
               <div className="bg-yellow-100 px-4 py-2 rounded-lg shadow border-yellow-300">

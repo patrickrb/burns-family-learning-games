@@ -213,10 +213,8 @@ export default function GamePage() {
         nextState(updatedCorrectStates)
       }, 1500)
     } else {
-      const selectedStateName = northeastStates.find(s => s.id === selectedStateId)?.name
-      const currentStateName = northeastStates.find(s => s.id === gameState.currentStateId)?.name
       setFeedback({
-        message: `That's ${selectedStateName}. The highlighted state is ${currentStateName}. Try again!`,
+        message: "Incorrect! Look at the highlighted state and try again!",
         type: "error"
       })
       

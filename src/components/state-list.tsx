@@ -61,14 +61,15 @@ export default function StateList({
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold">Select the State</CardTitle>
-        <p className="text-sm text-gray-600">
+    <div className="w-full">
+      <div className="bg-white rounded-lg border shadow-sm p-6 mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Select the State</h2>
+        <p className="text-sm text-gray-600 mb-4">
           Click on the state name that matches the highlighted state on the map.
         </p>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <Card className="w-full">
+        <CardContent className="pt-6">
         <div className="grid grid-cols-1 gap-2">
           {northeastStates
             .sort((a, b) => a.name.localeCompare(b.name))
@@ -98,5 +99,6 @@ export default function StateList({
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }

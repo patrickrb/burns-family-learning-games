@@ -12,7 +12,7 @@ export default function Home() {
 
   useEffect(() => {
     if (session) {
-      router.push("/game")
+      router.push("/setup")
     }
   }, [session, router])
 
@@ -21,7 +21,7 @@ export default function Home() {
   }
 
   const handlePlayNow = () => {
-    router.push("/game")
+    router.push("/setup")
   }
 
   if (status === "loading") {

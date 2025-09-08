@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import USMap from "@/components/us-map"
 import StateList from "@/components/state-list"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getStatesByRegion } from "@/data/states"
 
 interface GameState {
   currentStateId: string
@@ -22,23 +23,20 @@ interface GameState {
   elapsedTime: number
 }
 
-const northeastStates = [
-  { id: "CT", name: "Connecticut" },
-  { id: "DE", name: "Delaware" },
-  { id: "ME", name: "Maine" },
-  { id: "MD", name: "Maryland" },
-  { id: "MA", name: "Massachusetts" },
-  { id: "NH", name: "New Hampshire" },
-  { id: "NJ", name: "New Jersey" },
-  { id: "NY", name: "New York" },
-  { id: "PA", name: "Pennsylvania" },
-  { id: "RI", name: "Rhode Island" },
-  { id: "VT", name: "Vermont" },
-]
+type GameMode = "states" | "capitals"
+type Region = "northeast"
 
 export default function GamePage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Get game parameters from URL
+  const region = (searchParams.get("region") as Region) || "northeast"
+  const gameMode = (searchParams.get("mode") as GameMode) || "states"
+  
+  // Get states data for the selected region
+  const statesData = getStatesByRegion(region)
 
   const [gameState, setGameState] = useState<GameState>({
     currentStateId: "",
@@ -62,17 +60,22 @@ export default function GamePage() {
   // Timer state for display
   const [currentTime, setCurrentTime] = useState<number>(0)
 
-  // Allow guest play - no redirect needed
+  // Redirect to setup if no valid parameters
+  useEffect(() => {
+    if (!region || !gameMode || statesData.length === 0) {
+      router.push("/setup")
+    }
+  }, [region, gameMode, statesData, router])
 
   // Initialize game with random state that hasn't been completed
   const getRandomState = useCallback((currentCorrectStates: string[] = []) => {
-    const availableStates = northeastStates.filter(
+    const availableStates = statesData.filter(
       (state) => !currentCorrectStates.includes(state.id)
     )
     if (availableStates.length === 0) return null
     const randomIndex = Math.floor(Math.random() * availableStates.length)
     return availableStates[randomIndex].id
-  }, [])
+  }, [statesData])
 
   const initializeGame = useCallback(() => {
     // Reset game state first
@@ -91,7 +94,7 @@ export default function GamePage() {
     }
     
     // Pick a random first state from all available states
-    const firstState = northeastStates[Math.floor(Math.random() * northeastStates.length)]
+    const firstState = statesData[Math.floor(Math.random() * statesData.length)]
     
     setGameState({
       ...resetGameState,
@@ -99,7 +102,7 @@ export default function GamePage() {
     })
     
     setCurrentTime(0)
-  }, [])
+  }, [statesData])
 
     const nextState = useCallback((updatedCorrectStates: string[]) => {
     const nextStateId = getRandomState(updatedCorrectStates)
@@ -168,7 +171,16 @@ export default function GamePage() {
   }
 
   const handleStateSelect = async (selectedStateId: string) => {
-    const isCorrect = selectedStateId === gameState.currentStateId
+    let isCorrect = false
+    
+    if (gameMode === "states") {
+      // In states mode, user clicks state names and we check against the highlighted state
+      isCorrect = selectedStateId === gameState.currentStateId
+    } else {
+      // In capitals mode, user clicks capitals and we check against the capital of the shown state
+      const targetState = statesData.find(s => s.id === gameState.currentStateId)
+      isCorrect = selectedStateId === targetState?.capital
+    }
     
     // Handle incorrect answers immediately
     if (!isCorrect) {
@@ -186,13 +198,17 @@ export default function GamePage() {
     }
 
     if (isCorrect) {
-      const currentStateName = northeastStates.find(s => s.id === gameState.currentStateId)?.name
+      const currentState = statesData.find(s => s.id === gameState.currentStateId)
+      const feedbackMessage = gameMode === "states" 
+        ? `Correct! That's ${currentState?.name}!`
+        : `Correct! ${currentState?.capital} is the capital of ${currentState?.name}!`
+      
       setFeedback({
-        message: `Correct! That's ${currentStateName}!`,
+        message: feedbackMessage,
         type: "success"
       })
       
-      const updatedCorrectStates = [...gameState.correctStates, selectedStateId]
+      const updatedCorrectStates = [...gameState.correctStates, gameState.currentStateId]
       
       // Immediately clear the current target to avoid yellow flashing
       setGameState(prev => ({
@@ -206,15 +222,17 @@ export default function GamePage() {
         incorrectStates: prev.incorrectStates.filter(id => id !== selectedStateId), // Remove from incorrect states when answered correctly
       }))
       
-      // Don't force map re-render - let the color update system handle it naturally
-      
       // Move to next state after a delay, passing the updated correct states
       setTimeout(() => {
         nextState(updatedCorrectStates)
       }, 1500)
     } else {
+      const errorMessage = gameMode === "states"
+        ? "Incorrect! Look at the highlighted state and try again!"
+        : "Incorrect! Try again!"
+      
       setFeedback({
-        message: "Incorrect! Look at the highlighted state and try again!",
+        message: errorMessage,
         type: "error"
       })
       
@@ -233,8 +251,9 @@ export default function GamePage() {
           body: JSON.stringify({
             email: session.user.email,
             difficulty: "easy",
-            region: "northeast",
+            region: region,
             isCorrect,
+            gameMode,
           }),
         })
       } catch (error) {
@@ -280,7 +299,9 @@ export default function GamePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-xl">You have completed the Northeast States game!</p>
+              <p className="text-xl">
+                You have completed the {region.charAt(0).toUpperCase() + region.slice(1)} {gameMode === "states" ? "States" : "Capitals"} game!
+              </p>
               <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
                 <div className="bg-blue-100 p-4 rounded">
                   <div className="text-2xl font-bold text-blue-600">{gameState.score}</div>
@@ -324,7 +345,7 @@ export default function GamePage() {
                 ← Home
               </Button>
               <h1 className="text-3xl font-bold text-gray-900">
-                Northeast States Game
+                {region.charAt(0).toUpperCase() + region.slice(1)} {gameMode === "states" ? "States" : "Capitals"} Game
               </h1>
             </div>
             <div className="text-right">
@@ -345,7 +366,10 @@ export default function GamePage() {
             </div>
           </div>
           <p className="text-gray-600 mb-4">
-            Find the highlighted state on the map
+            {gameMode === "states" 
+              ? "Find the highlighted state on the map"
+              : `What is the capital of ${statesData.find(s => s.id === gameState.currentStateId)?.name || "the highlighted state"}?`
+            }
           </p>
           
           {/* Score Board */}
@@ -403,10 +427,11 @@ export default function GamePage() {
           <div className="order-1 md:order-2">
             <StateList
               onStateSelect={handleStateSelect}
-              selectedStates={gameState.selectedStates}
               correctStates={gameState.correctStates}
               incorrectStates={gameState.incorrectStates}
               disabled={feedback.type === "success"}
+              gameMode={gameMode}
+              statesData={statesData}
             />
             
             <div className="mt-4 text-center">

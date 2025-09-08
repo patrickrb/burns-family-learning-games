@@ -7,7 +7,6 @@ interface USMapProps {
   onStateClick?: (stateId: string) => void
   correctStates?: string[]
   incorrectStates?: string[]
-  renderKey?: number // Add a key to force re-renders
 }
 
 // Northeast states we want to make interactive
@@ -19,8 +18,7 @@ export default function USMap({
   highlightedState, 
   onStateClick, 
   correctStates = [],
-  incorrectStates = [],
-  renderKey = 0
+  incorrectStates = []
 }: USMapProps) {
   const [hoveredState, setHoveredState] = useState<string | null>(null)
   const [zoom, setZoom] = useState<number>(1)
@@ -101,48 +99,30 @@ export default function USMap({
   // Track state positions for React-controlled highlighting
   const [statePositions, setStatePositions] = useState<Record<string, { x: number, y: number, width: number, height: number }>>({})
 
-  // Force re-render when highlighted state changes
+  // Track highlighted state changes for logging
   useEffect(() => {
     if (highlightedState !== lastHighlightedState) {
-      console.log(`🔄 Highlighted state changed: ${lastHighlightedState} → ${highlightedState}`)
-      setLastHighlightedState(highlightedState)
+      console.log(`🔄 Highlighted state changed: "${lastHighlightedState}" → "${highlightedState}"`)
       
-      // Force immediate update if SVG is already loaded
-      if (svgLoaded && containerRef.current) {
-        const svgElement = containerRef.current.querySelector('svg')
-        if (svgElement && highlightedState) {
-          // Immediate highlight application with retry
-          const applyImmediateHighlight = () => {
-            const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
-            if (targetElements.length > 0) {
-              console.log(`⚡ Applying immediate highlight to ${highlightedState}`)
-              targetElements.forEach((element) => {
-                const svgElement = element as SVGPathElement
-                // Clear any existing conflicting styles
-                svgElement.removeAttribute('style')
-                svgElement.removeAttribute('fill')
-                
-                // Apply yellow highlighting immediately
-                svgElement.style.setProperty('fill', '#ffff00', 'important')
-                svgElement.style.setProperty('stroke', '#374151', 'important')
-                svgElement.style.setProperty('stroke-width', '2px', 'important')
-                svgElement.setAttribute('fill', '#ffff00')
-              })
-            } else {
-              console.warn(`⚠️ No elements found for immediate highlight of ${highlightedState}`)
-            }
-          }
-          
-          // Apply immediately and also with a small delay as backup
-          applyImmediateHighlight()
-          setTimeout(applyImmediateHighlight, 10)
-        }
+      // Special logging for problematic transitions
+      if (lastHighlightedState && !highlightedState) {
+        console.warn(`🚨 HIGHLIGHT CLEARED: Previous="${lastHighlightedState}" → New="${highlightedState}"`)
+        console.warn(`📊 At clear time - correct: [${correctStates.join(',')}], incorrect: [${incorrectStates.join(',')}]`)
       }
+      
+      setLastHighlightedState(highlightedState)
+      // Don't apply immediate updates - let the main color effect handle it
     }
-  }, [highlightedState, lastHighlightedState, svgLoaded])
+  }, [highlightedState, lastHighlightedState, correctStates, incorrectStates])
 
   // Load and setup SVG when component mounts
   useEffect(() => {
+    if (svgLoaded) {
+      console.log('🚫 SVG already loaded, skipping reload')
+      return
+    }
+    
+    console.log('📥 Starting SVG load...')
     fetch('/map.svg')
       .then(response => response.text())
       .then(svgText => {
@@ -233,20 +213,49 @@ export default function USMap({
       .catch(error => {
         console.error('Error loading SVG:', error)
       })
-  }, [onStateClick])
+  }, [svgLoaded]) // Only reload if svgLoaded changes
 
-  // Robust SVG color updates with better error handling
+  // Robust SVG color updates - only change what needs changing
   useEffect(() => {
     if (!svgLoaded) return
 
-    const updateColors = () => {
-      if (!containerRef.current) return
-      const svgElement = containerRef.current.querySelector('svg')
-      if (!svgElement) return
+    console.log(`🔍 Color update triggered - highlightedState: "${highlightedState}", correctStates: [${correctStates.join(',')}], incorrectStates: [${incorrectStates.join(',')}]`)
 
-      console.log(`🎨 Updating colors for renderKey ${renderKey}, highlighting: "${highlightedState}"`)
+    // Special handling for when highlight is cleared but we have game progress
+    const hasGameProgress = correctStates.length > 0 || incorrectStates.length > 0
+    const highlightCleared = !highlightedState || highlightedState.trim() === ""
+    
+    if (hasGameProgress && highlightCleared) {
+      console.warn(`⚠️ Highlight cleared during active game - preserving existing colors`)
+      console.warn(`📊 Preserving: correct=[${correctStates.join(',')}], incorrect=[${incorrectStates.join(',')}]`)
+      console.warn(`🛑 EARLY RETURN - Not updating colors to prevent wipe`)
+      return // Don't update colors at all when highlight is cleared during active game
+    }
+
+    // Also check if this is a fresh SVG load but we have game progress - preserve colors
+    if (hasGameProgress && !lastHighlightedState && !highlightedState) {
+      console.warn(`🔄 Fresh SVG load with existing game state - applying preserved colors`)
+      // Allow the color update to proceed to restore the correct colors
+    }
+
+    const updateColors = () => {
+      if (!containerRef.current) {
+        console.warn('⚠️ Container ref not available for color update')
+        return false
+      }
+      const svgElement = containerRef.current.querySelector('svg')
+      if (!svgElement) {
+        console.warn('⚠️ SVG element not found for color update')
+        return false
+      }
+
+      console.log(`🎨 Starting color update at ${new Date().toISOString()}`)
+      console.log(`📊 Input states - highlighted: "${highlightedState}", correct: [${correctStates.join(',')}], incorrect: [${incorrectStates.join(',')}]`)
       
-      // Process each state with priority-based coloring
+      let changesApplied = 0
+      let whitedOut = 0
+      
+      // Process each northeast state
       northeastStates.forEach(stateId => {
         const stateClass = stateId.toLowerCase()
         const stateElements = svgElement.querySelectorAll(`.${stateClass}`)
@@ -256,110 +265,83 @@ export default function USMap({
           return
         }
 
-        // Determine color with clear priority order
-        let color = '#ffffff' // default white
-        let priority = 0
+        // Determine what color and priority this state should have
+        let targetColor = '#ffffff' // default white
+        let targetPriority = 0
         
-        if (correctStates.includes(stateId)) {
-          color = '#10b981' // green
-          priority = 1
+        if (highlightedState && highlightedState === stateId) {
+          targetColor = '#ffff00' // bright yellow - highest priority
+          targetPriority = 3
+          console.log(`⭐ ${stateId} should be YELLOW (highlighted)`)
+        } else if (correctStates.includes(stateId)) {
+          targetColor = '#10b981' // green
+          targetPriority = 1
+          console.log(`✅ ${stateId} should be GREEN (correct)`)
         } else if (incorrectStates.includes(stateId)) {
-          color = '#ef4444' // red  
-          priority = 2
-        } else if (highlightedState === stateId) {
-          color = '#ffff00' // bright yellow - highest priority
-          priority = 3
-          console.log(`⭐ Setting ${stateId} to YELLOW (priority ${priority})`)
+          targetColor = '#ef4444' // red  
+          targetPriority = 2
+          console.log(`❌ ${stateId} should be RED (incorrect)`)
+        } else {
+          console.log(`⚪ ${stateId} should be WHITE (default)`)
+          if (targetColor === '#ffffff') {
+            whitedOut++
+          }
         }
         
-        // Apply styling to all elements for this state
+        // Apply color to all elements for this state
         stateElements.forEach((element) => {
           const svgElement = element as SVGPathElement
-          // Store the priority to avoid conflicts
-          svgElement.dataset.colorPriority = priority.toString()
           
-          // Comprehensive style clearing
-          svgElement.removeAttribute('style')
-          svgElement.removeAttribute('fill')
-          svgElement.style.cssText = '' // Clear any existing CSS
+          // Check current state
+          const currentPriority = parseInt(svgElement.dataset.colorPriority || '0')
+          const currentFill = svgElement.getAttribute('fill')
           
-          // Apply new styles with multiple methods for maximum compatibility
-          svgElement.setAttribute('fill', color)
-          svgElement.setAttribute('stroke', '#374151')
-          svgElement.setAttribute('stroke-width', '2')
-          svgElement.setAttribute('stroke-opacity', '1')
-          
-          // Force with CSS - use requestAnimationFrame for better timing
-          requestAnimationFrame(() => {
-            svgElement.style.setProperty('fill', color, 'important')
+          // Only update if something actually needs to change
+          if (currentPriority !== targetPriority || currentFill !== targetColor) {
+            console.log(`  🔄 ${stateId}: "${currentFill}" (p${currentPriority}) → "${targetColor}" (p${targetPriority})`)
+            
+            // Update the element
+            svgElement.dataset.colorPriority = targetPriority.toString()
+            svgElement.setAttribute('fill', targetColor)
+            svgElement.setAttribute('stroke', '#374151')
+            svgElement.setAttribute('stroke-width', '2')
+            svgElement.setAttribute('stroke-opacity', '1')
+            
+            // Apply CSS styles as backup
+            svgElement.style.setProperty('fill', targetColor, 'important')
             svgElement.style.setProperty('stroke', '#374151', 'important')
             svgElement.style.setProperty('stroke-width', '2px', 'important')
             svgElement.style.setProperty('stroke-opacity', '1', 'important')
-          })
-          
-          console.log(`  → ${stateId} set to ${color} (priority: ${priority})`)
+            
+            changesApplied++
+          } else {
+            console.log(`  ✓ ${stateId} already correct: "${targetColor}" (p${targetPriority})`)
+          }
         })
       })
-    }
-
-    // Multiple update attempts with increasing delays for reliability
-    const updateWithRetry = () => {
-      updateColors()
       
-      // If we have a highlighted state, verify it was applied and retry if needed
-      if (highlightedState) {
-        const verifyAndRetry = (attempt: number = 1) => {
-          if (attempt > 3) return // Max 3 attempts
-          
-          setTimeout(() => {
-            const svgElement = containerRef.current?.querySelector('svg')
-            if (!svgElement) return
-            
-            const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
-            if (targetElements.length === 0) return
-            
-            const element = targetElements[0] as SVGPathElement
-            const computedStyle = window.getComputedStyle(element)
-            const actualFill = computedStyle.fill
-            const isYellow = actualFill === 'rgb(255, 255, 0)' || actualFill === '#ffff00' || actualFill === 'yellow'
-            
-            if (!isYellow) {
-              console.log(`🔧 Retry ${attempt}: ${highlightedState} not yellow (${actualFill}), retrying...`)
-              
-              // Force a more aggressive update
-              targetElements.forEach((el) => {
-                const svgEl = el as SVGPathElement
-                svgEl.style.cssText = ''
-                svgEl.removeAttribute('fill')
-                // Use requestAnimationFrame for better timing
-                requestAnimationFrame(() => {
-                  svgEl.style.setProperty('fill', '#ffff00', 'important')
-                  svgEl.style.setProperty('stroke', '#374151', 'important')
-                  svgEl.style.setProperty('stroke-width', '2px', 'important')
-                  svgEl.setAttribute('fill', '#ffff00')
-                })
-              })
-              
-              // Try again if still not working
-              verifyAndRetry(attempt + 1)
-            } else {
-              console.log(`✅ ${highlightedState} successfully highlighted yellow on attempt ${attempt}`)
-            }
-          }, attempt * 150) // Increasing delays: 150ms, 300ms, 450ms
-        }
-        
-        verifyAndRetry()
+      console.log(`✅ Color update complete at ${new Date().toISOString()}`)
+      console.log(`📈 Applied ${changesApplied} changes, ${whitedOut} states set to white`)
+      
+      // Alert if many states are being whitened - this indicates a problem
+      if (whitedOut > 5) {
+        console.warn(`� WARNING: ${whitedOut} states being set to white - possible color wipe!`)
+        console.warn(`🚨 Current state: highlighted="${highlightedState}", correct=[${correctStates.join(',')}], incorrect=[${incorrectStates.join(',')}]`)
       }
+      
+      return true
     }
 
-    // Initial update with small delay
-    const timer = setTimeout(updateWithRetry, 50)
+    // Simple update with a small delay to ensure React state has settled
+    const timer = setTimeout(() => {
+      updateColors()
+    }, 10)
     
     return () => clearTimeout(timer)
-  }, [svgLoaded, highlightedState, correctStates, incorrectStates, renderKey])
+  }, [svgLoaded, highlightedState, correctStates, incorrectStates])
 
   return (
-    <div className="w-full h-full" key={`map-${renderKey}`}>
+    <div className="w-full h-full">
       <div className="relative bg-gradient-to-b from-sky-100 to-blue-200 rounded-lg border-2 border-gray-300 shadow-lg p-2 h-full">
         <div 
           className="w-full h-full flex items-center justify-center overflow-hidden relative"

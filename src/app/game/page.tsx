@@ -48,8 +48,6 @@ export default function GamePage() {
     gameComplete: false,
   })
 
-  const [mapRenderKey, setMapRenderKey] = useState<number>(0)
-
   const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" | null }>({
     message: "",
     type: null,
@@ -124,15 +122,23 @@ export default function GamePage() {
     
     // Handle incorrect answers immediately
     if (!isCorrect) {
+      console.log(`❌ Incorrect answer: ${selectedStateId}`)
+      console.log(`📊 Current incorrectStates: [${gameState.incorrectStates.join(',')}]`)
+      console.log(`📊 Current correctStates: [${gameState.correctStates.join(',')}]`)
+      
+      // Only add to incorrectStates if not already there (avoid duplicates)
+      const newIncorrectStates = gameState.incorrectStates.includes(selectedStateId) 
+        ? gameState.incorrectStates 
+        : [...gameState.incorrectStates, selectedStateId]
+      
       setGameState(prev => ({
         ...prev,
         attempts: prev.attempts + 1,
-        incorrectStates: [...prev.incorrectStates, selectedStateId],
+        incorrectStates: newIncorrectStates,
         selectedStates: [...prev.selectedStates, selectedStateId],
       }))
       
-      // Force map re-render
-      setMapRenderKey(prev => prev + 1)
+      console.log(`📊 New incorrectStates: [${newIncorrectStates.join(',')}]`)
     }
 
     if (isCorrect) {
@@ -157,14 +163,11 @@ export default function GamePage() {
         selectedStates: [...prev.selectedStates, selectedStateId],
       }))
       
-      // Force map re-render to show green state without yellow flash
-      setMapRenderKey(prev => prev + 1)
+      // Don't force map re-render - let the color update system handle it naturally
       
       // Move to next state after a delay, passing the updated correct states
       setTimeout(() => {
         nextState(updatedCorrectStates)
-        // Force map re-render when moving to next state
-        setMapRenderKey(prev => prev + 1)
       }, 1500)
     } else {
       const selectedStateName = northeastStates.find(s => s.id === selectedStateId)?.name
@@ -214,7 +217,6 @@ export default function GamePage() {
       gameComplete: false,
     })
     setFeedback({ message: "", type: null })
-    setMapRenderKey(prev => prev + 1)
     initializeGame()
   }
 
@@ -340,7 +342,6 @@ export default function GamePage() {
               onStateClick={handleStateSelect}
               correctStates={gameState.correctStates}
               incorrectStates={gameState.incorrectStates}
-              renderKey={mapRenderKey}
             />
           </div>
 

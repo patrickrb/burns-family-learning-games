@@ -26,6 +26,10 @@ export default function USMap({
   const [isPanning, setIsPanning] = useState<boolean>(false)
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
+  
+  // Refs to track previous state arrays for comparison
+  const prevCorrectStatesRef = useRef<string[]>([])
+  const prevIncorrectStatesRef = useRef<string[]>([])
 
 
   // Zoom and pan handlers
@@ -220,17 +224,28 @@ export default function USMap({
     if (!svgLoaded) return
 
     console.log(`🔍 Color update triggered - highlightedState: "${highlightedState}", correctStates: [${correctStates.join(',')}], incorrectStates: [${incorrectStates.join(',')}]`)
+    console.log(`🎯 Highlighted state check: "${highlightedState}" (type: ${typeof highlightedState}, length: ${highlightedState?.length})`)
 
     // Special handling for when highlight is cleared but we have game progress
     const hasGameProgress = correctStates.length > 0 || incorrectStates.length > 0
     const highlightCleared = !highlightedState || highlightedState.trim() === ""
     
-    if (hasGameProgress && highlightCleared) {
-      console.warn(`⚠️ Highlight cleared during active game - preserving existing colors`)
+    // Only skip updates if highlight is cleared AND the state arrays haven't changed
+    // This prevents color wipes when just the highlight changes, but allows updates when game state changes
+    const stateArraysChanged = 
+      JSON.stringify(correctStates) !== JSON.stringify(prevCorrectStatesRef.current) ||
+      JSON.stringify(incorrectStates) !== JSON.stringify(prevIncorrectStatesRef.current)
+    
+    if (hasGameProgress && highlightCleared && !stateArraysChanged) {
+      console.warn(`⚠️ Highlight cleared during active game with no state changes - preserving existing colors`)
       console.warn(`📊 Preserving: correct=[${correctStates.join(',')}], incorrect=[${incorrectStates.join(',')}]`)
       console.warn(`🛑 EARLY RETURN - Not updating colors to prevent wipe`)
       return // Don't update colors at all when highlight is cleared during active game
     }
+    
+    // Update the refs for next comparison
+    prevCorrectStatesRef.current = [...correctStates]
+    prevIncorrectStatesRef.current = [...incorrectStates]
 
     // Also check if this is a fresh SVG load but we have game progress - preserve colors
     if (hasGameProgress && !lastHighlightedState && !highlightedState) {
@@ -269,16 +284,17 @@ export default function USMap({
         let targetColor = '#ffffff' // default white
         let targetPriority = 0
         
+        // PRIORITY ORDER: Yellow (highlighted) > Green (correct) > Red (incorrect) > White (default)
         if (highlightedState && highlightedState === stateId) {
-          targetColor = '#ffff00' // bright yellow - highest priority
+          targetColor = '#ffff00' // bright yellow - HIGHEST priority
           targetPriority = 3
           console.log(`⭐ ${stateId} should be YELLOW (highlighted)`)
         } else if (correctStates.includes(stateId)) {
-          targetColor = '#10b981' // green
+          targetColor = '#10b981' // green - second priority
           targetPriority = 1
           console.log(`✅ ${stateId} should be GREEN (correct)`)
         } else if (incorrectStates.includes(stateId)) {
-          targetColor = '#ef4444' // red  
+          targetColor = '#ef4444' // red - third priority
           targetPriority = 2
           console.log(`❌ ${stateId} should be RED (incorrect)`)
         } else {

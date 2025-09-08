@@ -96,10 +96,20 @@ export default function GamePage() {
       console.log(`📊 Completed states: [${updatedCorrectStates.join(', ')}]`)
       console.log(`🎯 Remaining states: ${northeastStates.filter(s => !updatedCorrectStates.includes(s.id)).map(s => s.id).join(', ')}`)
       
+      // First set the new target state
       setGameState(prev => ({
         ...prev,
         currentStateId: nextStateId,
       }))
+      
+      // Then clear incorrect states after a small delay to ensure highlighting takes effect first
+      setTimeout(() => {
+        console.log(`🧹 Clearing incorrectStates for new round with target: ${nextStateId}`)
+        setGameState(prev => ({
+          ...prev,
+          incorrectStates: [], // Clear incorrect states for the new round
+        }))
+      }, 50)
       setFeedback({ message: "", type: null })
     } else {
       console.log(`🎉 Game completed! All ${updatedCorrectStates.length} states completed.`)
@@ -161,6 +171,7 @@ export default function GamePage() {
         score: prev.score + 10,
         correctStates: updatedCorrectStates,
         selectedStates: [...prev.selectedStates, selectedStateId],
+        incorrectStates: prev.incorrectStates.filter(id => id !== selectedStateId), // Remove from incorrect states when answered correctly
       }))
       
       // Don't force map re-render - let the color update system handle it naturally

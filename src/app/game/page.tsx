@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import USMap from "@/components/us-map"
@@ -26,7 +26,7 @@ interface GameState {
 type GameMode = "states" | "capitals"
 type Region = "northeast"
 
-export default function GamePage() {
+function GameContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -447,5 +447,21 @@ export default function GamePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function GameLoading() {
+  return (
+    <div className="flex justify-center items-center min-h-screen">
+      <div className="text-lg">Loading game...</div>
+    </div>
+  )
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={<GameLoading />}>
+      <GameContent />
+    </Suspense>
   )
 }

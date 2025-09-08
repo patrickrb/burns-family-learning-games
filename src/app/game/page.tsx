@@ -235,7 +235,7 @@ export default function GamePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-xl">You've completed the Northeast States game!</p>
+              <p className="text-xl">You have completed the Northeast States game!</p>
               <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
                 <div className="bg-blue-100 p-4 rounded">
                   <div className="text-2xl font-bold text-blue-600">{gameState.score}</div>
@@ -258,8 +258,6 @@ export default function GamePage() {
       </div>
     )
   }
-
-  const currentStateName = northeastStates.find(s => s.id === gameState.currentStateId)?.name
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 
 interface USMapProps {
   highlightedState?: string
@@ -116,16 +116,17 @@ export default function USMap({
             const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
             if (targetElements.length > 0) {
               console.log(`⚡ Applying immediate highlight to ${highlightedState}`)
-              targetElements.forEach((element: any) => {
+              targetElements.forEach((element) => {
+                const svgElement = element as SVGPathElement
                 // Clear any existing conflicting styles
-                element.removeAttribute('style')
-                element.removeAttribute('fill')
+                svgElement.removeAttribute('style')
+                svgElement.removeAttribute('fill')
                 
                 // Apply yellow highlighting immediately
-                element.style.setProperty('fill', '#ffff00', 'important')
-                element.style.setProperty('stroke', '#374151', 'important')
-                element.style.setProperty('stroke-width', '2px', 'important')
-                element.setAttribute('fill', '#ffff00')
+                svgElement.style.setProperty('fill', '#ffff00', 'important')
+                svgElement.style.setProperty('stroke', '#374151', 'important')
+                svgElement.style.setProperty('stroke-width', '2px', 'important')
+                svgElement.setAttribute('fill', '#ffff00')
               })
             } else {
               console.warn(`⚠️ No elements found for immediate highlight of ${highlightedState}`)
@@ -272,27 +273,28 @@ export default function USMap({
         }
         
         // Apply styling to all elements for this state
-        stateElements.forEach((element: any) => {
+        stateElements.forEach((element) => {
+          const svgElement = element as SVGPathElement
           // Store the priority to avoid conflicts
-          element.dataset.colorPriority = priority.toString()
+          svgElement.dataset.colorPriority = priority.toString()
           
           // Comprehensive style clearing
-          element.removeAttribute('style')
-          element.removeAttribute('fill')
-          element.style.cssText = '' // Clear any existing CSS
+          svgElement.removeAttribute('style')
+          svgElement.removeAttribute('fill')
+          svgElement.style.cssText = '' // Clear any existing CSS
           
           // Apply new styles with multiple methods for maximum compatibility
-          element.setAttribute('fill', color)
-          element.setAttribute('stroke', '#374151')
-          element.setAttribute('stroke-width', '2')
-          element.setAttribute('stroke-opacity', '1')
+          svgElement.setAttribute('fill', color)
+          svgElement.setAttribute('stroke', '#374151')
+          svgElement.setAttribute('stroke-width', '2')
+          svgElement.setAttribute('stroke-opacity', '1')
           
           // Force with CSS - use requestAnimationFrame for better timing
           requestAnimationFrame(() => {
-            element.style.setProperty('fill', color, 'important')
-            element.style.setProperty('stroke', '#374151', 'important')
-            element.style.setProperty('stroke-width', '2px', 'important')
-            element.style.setProperty('stroke-opacity', '1', 'important')
+            svgElement.style.setProperty('fill', color, 'important')
+            svgElement.style.setProperty('stroke', '#374151', 'important')
+            svgElement.style.setProperty('stroke-width', '2px', 'important')
+            svgElement.style.setProperty('stroke-opacity', '1', 'important')
           })
           
           console.log(`  → ${stateId} set to ${color} (priority: ${priority})`)
@@ -316,7 +318,7 @@ export default function USMap({
             const targetElements = svgElement.querySelectorAll(`.${highlightedState.toLowerCase()}`)
             if (targetElements.length === 0) return
             
-            const element = targetElements[0] as any
+            const element = targetElements[0] as SVGPathElement
             const computedStyle = window.getComputedStyle(element)
             const actualFill = computedStyle.fill
             const isYellow = actualFill === 'rgb(255, 255, 0)' || actualFill === '#ffff00' || actualFill === 'yellow'
@@ -325,15 +327,16 @@ export default function USMap({
               console.log(`🔧 Retry ${attempt}: ${highlightedState} not yellow (${actualFill}), retrying...`)
               
               // Force a more aggressive update
-              targetElements.forEach((el: any) => {
-                el.style.cssText = ''
-                el.removeAttribute('fill')
+              targetElements.forEach((el) => {
+                const svgEl = el as SVGPathElement
+                svgEl.style.cssText = ''
+                svgEl.removeAttribute('fill')
                 // Use requestAnimationFrame for better timing
                 requestAnimationFrame(() => {
-                  el.style.setProperty('fill', '#ffff00', 'important')
-                  el.style.setProperty('stroke', '#374151', 'important')
-                  el.style.setProperty('stroke-width', '2px', 'important')
-                  el.setAttribute('fill', '#ffff00')
+                  svgEl.style.setProperty('fill', '#ffff00', 'important')
+                  svgEl.style.setProperty('stroke', '#374151', 'important')
+                  svgEl.style.setProperty('stroke-width', '2px', 'important')
+                  svgEl.setAttribute('fill', '#ffff00')
                 })
               })
               

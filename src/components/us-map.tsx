@@ -35,8 +35,8 @@ export default function USMap({
     e.preventDefault()
     const zoomFactor = 0.1
     const newZoom = e.deltaY > 0 
-      ? Math.max(0.5, zoom - zoomFactor) 
-      : Math.min(3, zoom + zoomFactor)
+      ? Math.max(0.8, zoom - zoomFactor) // Minimum zoom increased since we're focused on NE
+      : Math.min(4, zoom + zoomFactor)   // Maximum zoom increased for better detail
     setZoom(newZoom)
   }
 
@@ -66,6 +66,33 @@ export default function USMap({
   const resetZoomAndPan = () => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
+    
+    // Reset viewBox to Northeast region if SVG is loaded
+    if (containerRef.current) {
+      const svgElement = containerRef.current.querySelector('svg')
+      if (svgElement && Object.keys(statePositions).length > 0) {
+        // Recalculate Northeast bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        
+        Object.values(statePositions).forEach(pos => {
+          minX = Math.min(minX, pos.x)
+          minY = Math.min(minY, pos.y)
+          maxX = Math.max(maxX, pos.x + pos.width)
+          maxY = Math.max(maxY, pos.y + pos.height)
+        })
+        
+        if (minX !== Infinity) {
+          const padding = 20
+          const neWidth = maxX - minX + (padding * 2)
+          const neHeight = maxY - minY + (padding * 2)
+          const neX = minX - padding
+          const neY = minY - padding
+          
+          svgElement.setAttribute('viewBox', `${neX} ${neY} ${neWidth} ${neHeight}`)
+          console.log('🔄 Reset to Northeast view')
+        }
+      }
+    }
   }
 
   // Track SVG load state and force updates
@@ -155,8 +182,10 @@ export default function USMap({
               }
             })
             
-            // Calculate state positions for overlay system
+            // Calculate state positions and create focused viewBox for Northeast region
             const positions: Record<string, { x: number, y: number, width: number, height: number }> = {}
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+            
             northeastStates.forEach(stateId => {
               const stateClass = stateId.toLowerCase()
               const stateElement = svgElement.querySelector(`.${stateClass}`) as SVGGraphicsElement
@@ -168,14 +197,33 @@ export default function USMap({
                   width: bbox.width,
                   height: bbox.height
                 }
+                
+                // Track the overall bounding box of all Northeast states
+                minX = Math.min(minX, bbox.x)
+                minY = Math.min(minY, bbox.y)
+                maxX = Math.max(maxX, bbox.x + bbox.width)
+                maxY = Math.max(maxY, bbox.y + bbox.height)
               }
             })
             setStatePositions(positions)
             
+            // Set viewBox to focus on Northeast region with some padding
+            if (minX !== Infinity) {
+              const padding = 20 // Add some padding around the region
+              const neWidth = maxX - minX + (padding * 2)
+              const neHeight = maxY - minY + (padding * 2)
+              const neX = minX - padding
+              const neY = minY - padding
+              
+              svgElement.setAttribute('viewBox', `${neX} ${neY} ${neWidth} ${neHeight}`)
+              console.log(`🔍 Set viewBox to focus on Northeast: ${neX} ${neY} ${neWidth} ${neHeight}`)
+              console.log(`📍 Northeast region bounds: x=${minX}-${maxX}, y=${minY}-${maxY}`)
+            }
+            
             // Mark SVG as loaded with a small delay to ensure DOM is ready
             setTimeout(() => {
               setSvgLoaded(true)
-              console.log('🚀 SVG loaded with state positions calculated')
+              console.log('🚀 SVG loaded with state positions calculated and zoomed to Northeast')
               console.log(`📊 Found ${Object.keys(positions).length} northeast states in SVG`)
             }, 100)
           }
@@ -341,7 +389,7 @@ export default function USMap({
         {/* Zoom Controls */}
         <div className="absolute bottom-4 right-4 flex flex-col space-y-2">
           <button
-            onClick={() => setZoom(prev => Math.min(3, prev + 0.2))}
+            onClick={() => setZoom(prev => Math.min(4, prev + 0.2))}
             className="bg-white/90 hover:bg-white text-gray-700 p-2 rounded shadow-md transition-colors"
             title="Zoom In"
           >
@@ -353,7 +401,7 @@ export default function USMap({
             </svg>
           </button>
           <button
-            onClick={() => setZoom(prev => Math.max(0.5, prev - 0.2))}
+            onClick={() => setZoom(prev => Math.max(0.8, prev - 0.2))}
             className="bg-white/90 hover:bg-white text-gray-700 p-2 rounded shadow-md transition-colors"
             title="Zoom Out"
           >
